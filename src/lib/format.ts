@@ -39,3 +39,9 @@ export function fmtMoney(n: number): string {
   if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
   return `$${n.toFixed(0)}`;
 }
+
+/** Some upstream government sources (ISED's ITB page) use em-dashes in their own text. Strip them
+ * for display only; the committed snapshot keeps the source text as published. */
+export function stripEmDash(s: string): string {
+  return s.replace(/\s*—\s*/g, ": ");
+}

@@ -9,6 +9,7 @@
 import { db } from "@/db/client";
 import { contracts } from "@/db/schema";
 import { sql, desc, and, ilike, or, type SQL } from "drizzle-orm";
+import { matchItbProject } from "./itb-match";
 
 export interface ContractFilters {
   q?: string;
@@ -42,7 +43,7 @@ export async function queryContracts(f: ContractFilters) {
   const pageSize = f.pageSize ?? 20;
   const where = buildWhere(f);
 
-  const [rows, totalRow] = await Promise.all([
+  const [rawRows, totalRow] = await Promise.all([
     db
       .select()
       .from(contracts)
@@ -52,6 +53,14 @@ export async function queryContracts(f: ContractFilters) {
       .offset((page - 1) * pageSize),
     db.select({ count: sql<number>`count(*)::int` }).from(contracts).where(where),
   ]);
+
+  // The government's own description is often a generic commodity category rather than the real
+  // project name, even for multi-billion-dollar contracts. Cross-reference against ITB obligations
+  // (same vendor, matching dollar value) to surface the actual project name when we have one.
+  const rows = rawRows.map((row) => ({
+    ...row,
+    itbMatch: matchItbProject(row.vendorName, row.contractValue),
+  }));
 
   return { rows, total: totalRow[0]?.count ?? 0, page, pageSize };
 }
