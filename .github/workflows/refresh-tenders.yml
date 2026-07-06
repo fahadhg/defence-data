@@ -1,0 +1,37 @@
+name: Refresh defence tenders snapshot
+
+on:
+  schedule:
+    # 13:00 UTC = 8/9am Eastern — after CanadaBuys' 7:00-8:30am ET morning refresh
+    - cron: "0 13 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run snapshot
+
+      - name: Commit snapshot if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- data/defence-tenders.json; then
+            git add data/defence-tenders.json
+            git commit -m "chore: refresh defence tenders snapshot"
+            git push
+          else
+            echo "No changes to snapshot."
+          fi

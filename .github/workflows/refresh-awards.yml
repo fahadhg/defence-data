@@ -1,0 +1,37 @@
+name: Refresh defence awards snapshot
+
+on:
+  schedule:
+    # Weekly (Mondays 13:00 UTC) — award/contract-history files refresh far less often than tenders.
+    - cron: "0 13 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run snapshot:awards
+
+      - name: Commit snapshot if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- data/defence-awards.json; then
+            git add data/defence-awards.json
+            git commit -m "chore: refresh defence awards snapshot"
+            git push
+          else
+            echo "No changes to snapshot."
+          fi
