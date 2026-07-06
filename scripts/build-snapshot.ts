@@ -1,5 +1,5 @@
 /**
- * build-snapshot.ts — Fetch live open tenders, keep defence/dual-use matches, write snapshot.
+ * build-snapshot.ts - Fetch live open tenders, keep defence/dual-use matches, write snapshot.
  * Run: npx tsx scripts/build-snapshot.ts   (the daily cron does the same in production)
  */
 import { writeFileSync, mkdirSync } from "node:fs";

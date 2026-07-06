@@ -16,7 +16,7 @@ export function TenderCard({ tender }: { tender: Tender }) {
         </h3>
         <Chip tone={badge.tone}>{badge.label}</Chip>
       </div>
-      <div className="mt-1.5 text-sm text-muted">{tender.buyer || "—"}</div>
+      <div className="mt-1.5 text-sm text-muted">{tender.buyer || "N/A"}</div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {tender.categories.slice(0, 4).map((c) => (
           <Chip key={c} tone={categoryTone(c)}>{c}</Chip>

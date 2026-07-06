@@ -1,5 +1,5 @@
 /**
- * build-awards-snapshot.ts — Fetch all fiscal-year award notices, keep defence/dual-use
+ * build-awards-snapshot.ts - Fetch all fiscal-year award notices, keep defence/dual-use
  * matches, write snapshot. Run: npx tsx scripts/build-awards-snapshot.ts
  */
 import { writeFileSync, mkdirSync } from "node:fs";

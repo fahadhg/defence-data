@@ -1,0 +1,37 @@
+name: Refresh ITB obligations snapshot
+
+on:
+  schedule:
+    # Monthly (15th, 15:00 UTC) — ISED's contractor-progress report updates infrequently.
+    - cron: "0 15 15 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run snapshot:itb
+
+      - name: Commit snapshot if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- data/defence-itb-obligations.json; then
+            git add data/defence-itb-obligations.json
+            git commit -m "chore: refresh ITB obligations snapshot"
+            git push
+          else
+            echo "No changes to snapshot."
+          fi

@@ -1,5 +1,5 @@
 /**
- * tenders.ts — Enrich raw CanadaBuys tenders with defence classification + derived fields,
+ * tenders.ts - Enrich raw CanadaBuys tenders with defence classification + derived fields,
  * and provide the query surface the UI uses.
  *
  * Phase 1 reads a committed JSON snapshot (small: ~850 open tenders). The daily cron

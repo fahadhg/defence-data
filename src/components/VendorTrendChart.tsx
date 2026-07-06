@@ -1,5 +1,5 @@
 /**
- * Simple bar-per-year trend, single hue (magnitude over an ordered dimension — fiscal year).
+ * Simple bar-per-year trend, single hue (magnitude over an ordered dimension: fiscal year).
  * Server component: no interaction needed for a small, fixed set of years.
  */
 import { fmtMoney } from "@/lib/format";

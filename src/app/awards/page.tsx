@@ -6,7 +6,7 @@ import { AwardRow } from "@/components/AwardRow";
 import { AwardFiltersBar } from "@/components/AwardFiltersBar";
 import { fmtMoney } from "@/lib/format";
 
-export const metadata = { title: "Contract History — Defence Procurement Intelligence" };
+export const metadata = { title: "Contract History | Defence Procurement Intelligence" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 

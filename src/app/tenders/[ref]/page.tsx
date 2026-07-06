@@ -42,8 +42,8 @@ export default async function TenderDetailPage({ params }: { params: Params }) {
         <Field label="Reference #" value={tender.ref} mono />
         <Field label="Notice type" value={tender.noticeType} />
         <Field label="Procurement method" value={tender.method} />
-        <Field label="Delivery region" value={tender.delivery || tender.regions || "—"} />
-        {tender.gsin && <Field label="GSIN" value={`${tender.gsinCode ? tender.gsinCode + " — " : ""}${tender.gsin}`} />}
+        <Field label="Delivery region" value={tender.delivery || tender.regions || "N/A"} />
+        {tender.gsin && <Field label="GSIN" value={`${tender.gsinCode ? tender.gsinCode + ": " : ""}${tender.gsin}`} />}
         {tender.unspsc && <Field label="UNSPSC" value={tender.unspsc} />}
       </div>
 
@@ -97,7 +97,7 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   return (
     <div>
       <div className="text-xs text-muted-2 uppercase tracking-wide">{label}</div>
-      <div className={mono ? "mono text-xs mt-0.5" : "mt-0.5"}>{value || "—"}</div>
+      <div className={mono ? "mono text-xs mt-0.5" : "mt-0.5"}>{value || "N/A"}</div>
     </div>
   );
 }

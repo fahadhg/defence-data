@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ── Defence Procurement Intelligence — dark command-center theme ────────── */
+/* Defence Procurement Intelligence: dark command-center theme */
 :root {
   --background: #0a0d11;
   --panel: #12171d;
@@ -10,7 +10,7 @@
   --foreground: #e8edf2;
   --muted: #8b97a3;
   --muted-2: #6b7682;
-  --accent: #e0a63d;      /* amber — signal */
+  --accent: #e0a63d;      /* amber, signal */
   --accent-ink: #1a1206;
   --blue: #5aa2ff;
   --green: #46c58a;

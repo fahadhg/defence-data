@@ -5,7 +5,7 @@ import { TenderCard } from "@/components/TenderCard";
 import { TenderFiltersBar } from "@/components/TenderFiltersBar";
 import Link from "next/link";
 
-export const metadata = { title: "Tenders — Defence Procurement Intelligence" };
+export const metadata = { title: "Tenders | Defence Procurement Intelligence" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 

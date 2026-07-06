@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { getTenders, getSnapshot, getAwards } from "@/lib/data";
 import { queryTenders } from "@/lib/tenders";
-import { queryAwards } from "@/lib/awards";
+import { queryAwards, queryExpiring } from "@/lib/awards";
 import { StatTile } from "@/components/StatTile";
 import { CategoryBarChart } from "@/components/CategoryBarChart";
 import { TenderCard } from "@/components/TenderCard";
+import { ExpiringRow } from "@/components/ExpiringRow";
 import { fmtMoney } from "@/lib/format";
 
 export default function OverviewPage() {
@@ -14,6 +15,7 @@ export default function OverviewPage() {
 
   const awards = getAwards();
   const awardResult = queryAwards(awards, { pageSize: 1000 });
+  const expiring = queryExpiring(awards, { window: "imminent", pageSize: 6 });
 
   const closingSoon = all.filter((t) => t.closingSoon);
   const openCount = all.filter((t) => t.daysToClose === null || t.daysToClose >= 0).length;
@@ -26,10 +28,12 @@ export default function OverviewPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Canada Defence Procurement Intelligence</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Defence Procurement Intelligence for Canada&apos;s Advanced Manufacturing Sector</h1>
         <p className="mt-1.5 text-muted max-w-2xl">
-          Live tenders and federal contracting history for defence & dual-use manufacturers — filtered from
-          the full CanadaBuys open-data feed by buyer, GSIN classification, and capability keywords.
+          This platform helps Canada&apos;s dual-use manufacturers identify and pursue defence procurement
+          opportunities. Every tender and awarded contract is drawn from the full CanadaBuys open data feed
+          and classified by buyer, GSIN code, and capability keyword, surfacing the opportunities that match
+          what Canadian companies build.
         </p>
       </div>
 
@@ -84,6 +88,27 @@ export default function OverviewPage() {
         <StatTile label="Total defence contract value (FY22–present)" value={fmtMoney(awardResult.totalValue)} tone="accent" />
         <StatTile label="Defence contracts awarded" value={awardResult.total.toLocaleString()} tone="blue" />
         <StatTile label="Distinct defence contractors" value={String(awardResult.facets.topVendors.length > 0 ? new Set(awards.map((a) => a.vendor).filter(Boolean)).size : 0)} tone="green" />
+      </div>
+
+      <div>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-medium text-muted">
+            Contract Expiry Radar <span className="text-muted-2 font-normal">: imminent recompete windows</span>
+          </h2>
+          <Link href="/expiring" className="text-xs link-accent">
+            view all →
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {expiring.rows.map((a) => (
+            <ExpiringRow key={`${a.ref}-${a.contractNumber}`} award={a} />
+          ))}
+        </div>
+        {expiring.rows.length === 0 && (
+          <div className="panel p-8 text-center text-muted text-sm">
+            No contracts expiring within 6 months.
+          </div>
+        )}
       </div>
 
       <div>

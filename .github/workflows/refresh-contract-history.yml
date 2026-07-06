@@ -1,0 +1,25 @@
+name: Refresh deep contract history
+
+on:
+  schedule:
+    # Monthly (1st, 16:00 UTC) — proactive disclosure is reported quarterly upstream.
+    - cron: "0 16 1 * *"
+  workflow_dispatch: {}
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Ingest contract history into Postgres
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx tsx scripts/ingest-contract-history.ts

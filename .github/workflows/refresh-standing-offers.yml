@@ -1,0 +1,37 @@
+name: Refresh standing offers snapshot
+
+on:
+  schedule:
+    # Weekly (Mondays 14:00 UTC) — SOSA feed itself refreshes weekly upstream.
+    - cron: "0 14 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run snapshot:standing-offers
+
+      - name: Commit snapshot if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- data/defence-standing-offers.json; then
+            git add data/defence-standing-offers.json
+            git commit -m "chore: refresh standing offers snapshot"
+            git push
+          else
+            echo "No changes to snapshot."
+          fi

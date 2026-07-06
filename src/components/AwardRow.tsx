@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Award } from "@/lib/awards";
+import { effectiveOrgs } from "@/lib/org";
 import { fmtDate, fmtMoney, categoryTone } from "@/lib/format";
 import { Chip } from "./Chip";
 
 export function AwardRow({ award }: { award: Award }) {
+  const orgs = effectiveOrgs(award);
   return (
     <div className="panel p-4">
       <div className="flex items-start justify-between gap-3">
@@ -13,7 +15,17 @@ export function AwardRow({ award }: { award: Award }) {
             <Link href={`/vendors/${encodeURIComponent(award.vendor)}`} className="link-accent">
               {award.vendor || "Unknown vendor"}
             </Link>
-            <span className="text-muted"> — {award.buyer || "—"}</span>
+            <span className="text-muted"> · </span>
+            {orgs.length > 0 ? (
+              <>
+                <Link href={`/buyers/${encodeURIComponent(orgs[0])}`} className="text-muted hover:text-accent transition-colors">
+                  {orgs[0]}
+                </Link>
+                {orgs.length > 1 && <span className="text-muted-2"> +{orgs.length - 1}</span>}
+              </>
+            ) : (
+              <span className="text-muted">N/A</span>
+            )}
           </div>
         </div>
         <div className="text-right shrink-0">

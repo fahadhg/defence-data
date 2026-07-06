@@ -8,10 +8,15 @@
     "start": "next start",
     "lint": "eslint",
     "snapshot": "tsx scripts/build-snapshot.ts",
-    "snapshot:awards": "tsx scripts/build-awards-snapshot.ts"
+    "snapshot:awards": "tsx scripts/build-awards-snapshot.ts",
+    "snapshot:standing-offers": "tsx scripts/build-standing-offers-snapshot.ts",
+    "snapshot:blueprint": "tsx scripts/build-blueprint-snapshot.ts",
+    "snapshot:itb": "tsx scripts/build-itb-snapshot.ts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "csv-parse": "^7.0.1",
+    "drizzle-orm": "^0.45.2",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -22,6 +27,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",

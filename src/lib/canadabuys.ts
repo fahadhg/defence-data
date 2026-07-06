@@ -1,12 +1,12 @@
 /**
- * canadabuys.ts — Download & parse CanadaBuys open-data CSV feeds.
+ * canadabuys.ts - Download & parse CanadaBuys open-data CSV feeds.
  *
  * Ports the field map from the legacy Python pipeline (legacy/tender-pipeline/fetch.py)
  * to TypeScript, and adds the GSIN code + end-user-entity fields the defence filter needs.
  *
  * Feeds (bilingual columns, English suffix `-eng`):
- *   Open tenders   — refreshed each morning
- *   Award notices  — winners + contract value, Aug 2022 → now
+ *   Open tenders   - refreshed each morning
+ *   Award notices  - winners + contract value, Aug 2022 → now
  */
 import { parse } from "csv-parse/sync";
 
@@ -71,10 +71,39 @@ export interface RawTender {
   description: string;
 }
 
+/**
+ * A few *.canada.ca subdomains (e.g. sosa.canadabuys.canada.ca) serve only their leaf TLS
+ * certificate without the intermediate. Browsers and curl tolerate this via AIA chasing;
+ * Node's fetch does not and throws UNABLE_TO_VERIFY_LEAF_SIGNATURE. Rather than disabling
+ * verification, fall back to curl (which performs the same real chain validation) only for
+ * that specific failure - this fetches over a properly verified TLS connection either way.
+ */
+async function fetchViaCurl(url: string): Promise<Buffer> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
+  const { stdout } = await run(
+    "curl",
+    ["-sS", "-L", "--fail", "-H", `User-Agent: ${HEADERS["User-Agent"]}`, url],
+    { maxBuffer: 1024 * 1024 * 200, encoding: "buffer" },
+  );
+  return stdout as unknown as Buffer;
+}
+
 async function fetchCsvRows(url: string): Promise<Record<string, string>[]> {
-  const resp = await fetch(url, { headers: HEADERS });
-  if (!resp.ok) throw new Error(`Fetch ${url} failed: ${resp.status} ${resp.statusText}`);
-  const buf = Buffer.from(await resp.arrayBuffer());
+  let buf: Buffer;
+  try {
+    const resp = await fetch(url, { headers: HEADERS });
+    if (!resp.ok) throw new Error(`Fetch ${url} failed: ${resp.status} ${resp.statusText}`);
+    buf = Buffer.from(await resp.arrayBuffer());
+  } catch (e) {
+    const cause = (e as Error).cause as { code?: string } | undefined;
+    if (cause?.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE") {
+      buf = await fetchViaCurl(url);
+    } else {
+      throw e;
+    }
+  }
   // strip UTF-8 BOM if present
   const text = buf.toString("utf-8").replace(/^﻿/, "");
   return parse(text, {
@@ -124,6 +153,8 @@ const AWARD_FIELD_MAP: Record<string, string> = {
   unspsc: "unspscDescription-eng",
   category: "procurementCategory-categorieApprovisionnement",
   method: "procurementMethod-methodeApprovisionnement-eng",
+  limitedTenderingReason: "limitedTenderingReason-raisonAppelOffresLimite-eng",
+  selectionCriteria: "selectionCriteria-criteresSelection-eng",
   regions: "regionsOfDelivery-regionsLivraison-eng",
   vendor: "supplierLegalName-nomLegalFournisseur-eng",
   vendorCity: "supplierAddressCity-fournisseurAdresseVille-eng",
@@ -152,6 +183,8 @@ export interface RawAward {
   unspsc: string;
   category: string;
   method: string;
+  limitedTenderingReason: string;
+  selectionCriteria: string;
   regions: string;
   vendor: string;
   vendorCity: string;
@@ -191,4 +224,48 @@ export async function fetchAllAwards(): Promise<RawAward[]> {
     }
   }
   return all;
+}
+
+export const STANDING_OFFERS_CSV = "https://sosa.canadabuys.canada.ca/cds/opendata/tpsgc-pwgsc_ocama-sosa.csv";
+
+/** friendly key → CSV column name, for the Standing Offers / Supply Arrangements (SOSA) feed. */
+const STANDING_OFFER_FIELD_MAP: Record<string, string> = {
+  title: "sosa-description_en",
+  commodityCode: "commodity",
+  commodity: "commodity-description_en",
+  supplierName: "supplier-standardized-name",
+  supplierLegalName: "supplier-legal-name",
+  endUser: "end-user-entity_en",
+  awardDate: "award-date",
+  expiryDate: "expiry-date",
+  deliveryPoint: "delivery-point_en",
+  agreementType: "agreement-type_en",
+  agreementNumber: "agreement-number",
+  filePublished: "date-file-published",
+};
+
+export interface RawStandingOffer {
+  title: string;
+  commodityCode: string;
+  commodity: string;
+  supplierName: string;
+  supplierLegalName: string;
+  endUser: string;
+  awardDate: string;
+  expiryDate: string;
+  deliveryPoint: string;
+  agreementType: string;
+  agreementNumber: string;
+  filePublished: string;
+}
+
+/** Download + parse the standing offers / supply arrangements feed (refreshed weekly). */
+export async function fetchStandingOffers(): Promise<RawStandingOffer[]> {
+  const rows = await fetchCsvRows(STANDING_OFFERS_CSV);
+  const out: RawStandingOffer[] = [];
+  for (const row of rows) {
+    const s = project<RawStandingOffer>(row, STANDING_OFFER_FIELD_MAP);
+    if (s.agreementNumber && s.title) out.push(s);
+  }
+  return out;
 }

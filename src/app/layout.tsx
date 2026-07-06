@@ -7,15 +7,21 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Defence Procurement Intelligence — Canada",
+  title: "Defence Procurement Intelligence for Canada's Advanced Manufacturing Sector",
   description:
-    "Search live CanadaBuys defence & dual-use tenders and federal contracting history.",
+    "A platform built for Canada's dual-use manufacturers, giving them the intelligence they need to find and pursue defence procurement opportunities across the Government of Canada's contracting system.",
 };
 
 const NAV = [
   { href: "/", label: "Overview" },
   { href: "/tenders", label: "Tenders" },
-  { href: "/awards", label: "Contract History" },
+  { href: "/awards", label: "Awards (2022–present)" },
+  { href: "/contract-history", label: "Deep History (2011–present)" },
+  { href: "/expiring", label: "Expiry Radar" },
+  { href: "/standing-offers", label: "Standing Offers" },
+  { href: "/buyers", label: "Buyer Intelligence" },
+  { href: "/investment-plan", label: "Investment Plan" },
+  { href: "/industrial-benefits", label: "Industrial Benefits" },
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

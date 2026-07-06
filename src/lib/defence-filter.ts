@@ -1,5 +1,5 @@
 /**
- * defence-filter.ts — Transparent, tunable classifier for defence / dual-use procurement.
+ * defence-filter.ts - Transparent, tunable classifier for defence / dual-use procurement.
  *
  * A record is DEFENCE-relevant if ANY signal fires:
  *   1. Buyer / end-user is a defence or national-security organization.
@@ -9,7 +9,7 @@
  * We keep every matched reason so the UI can show WHY a tender surfaced, and we tag a
  * capability CATEGORY so users can facet by domain (Aerospace, Maritime, Cyber, …).
  *
- * Edit the tables below to tighten or loosen coverage — this is the single source of truth.
+ * Edit the tables below to tighten or loosen coverage - this is the single source of truth.
  */
 
 /** Signal for anything with these org names as buyer or end user. */
@@ -98,10 +98,10 @@ const KEYWORD_CATEGORIES: { category: string; terms: string[] }[] = [
 ];
 
 /**
- * Obvious non-defence categories — drop these even if a weak keyword accidentally matched.
+ * Obvious non-defence categories - drop these even if a weak keyword accidentally matched.
  * Includes generic federal IT-staffing vehicles (TBIPS/SBIPS) whose skill-category lists
  * ("Electronic Warfare", "Cyber Security", …) describe staff specializations, not the
- * contract's actual subject — a real source of false positives at corpus scale.
+ * contract's actual subject - a real source of false positives at corpus scale.
  */
 const HARD_EXCLUDE = new RegExp(
   [
@@ -141,13 +141,13 @@ export interface Classifiable {
   endUser?: string;
 }
 
-/** Classify a record. Pure function — no I/O. */
+/** Classify a record. Pure function - no I/O. */
 export function classifyDefence(rec: Classifiable): DefenceMatch {
   const reasons: string[] = [];
   const categories = new Set<string>();
   let strength: DefenceMatch["strength"] = null;
 
-  // 1. Buyer / end-user organization (also scan title — e.g. "… for Department of National Defence")
+  // 1. Buyer / end-user organization (also scan title - e.g. "… for Department of National Defence")
   const orgText = `${rec.buyer ?? ""} ${rec.endUser ?? ""} ${rec.title ?? ""}`;
   for (const { pattern, label } of DEFENCE_ORGS) {
     if (pattern.test(orgText)) {
@@ -159,7 +159,7 @@ export function classifyDefence(rec: Classifiable): DefenceMatch {
   // 2. Military GSIN family
   const fsc = numericFsc(rec.gsinCode ?? "");
   if (fsc && MILITARY_FSC[fsc]) {
-    reasons.push(`GSIN ${fsc}xx — ${MILITARY_FSC[fsc]}`);
+    reasons.push(`GSIN ${fsc}xx - ${MILITARY_FSC[fsc]}`);
     if (strength !== "buyer") strength = "gsin";
   }
 

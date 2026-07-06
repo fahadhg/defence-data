@@ -1,10 +1,11 @@
 /**
- * awards.ts — Enrich raw CanadaBuys award notices with defence classification + derived fields.
+ * awards.ts - Enrich raw CanadaBuys award notices with defence classification + derived fields.
  * Mirrors tenders.ts; awards additionally carry contract value and vendor identity.
  */
 import type { RawAward } from "./canadabuys";
 import { classifyDefence } from "./defence-filter";
 import { PROCUREMENT_CATEGORY_LABELS } from "./tenders";
+import { effectiveOrgs } from "./org";
 
 export interface Award {
   ref: string;
@@ -21,6 +22,8 @@ export interface Award {
   category: string;
   categoryLabel: string;
   method: string;
+  limitedTenderingReason: string;
+  selectionCriteria: string;
   status: string;
   instrumentType: string;
   awardDate: string;
@@ -34,12 +37,42 @@ export interface Award {
   categories: string[];
   matchReasons: string[];
   strength: "buyer" | "gsin" | "keyword" | null;
+  daysToExpiry: number | null;
+  expiryWindow: "imminent" | "near" | "later" | "past" | null;
+  isSoleSource: boolean;
 }
 
 function parseMoney(s: string): number {
   const n = Number(String(s).replace(/[^0-9.-]/g, ""));
   return isFinite(n) ? n : 0;
 }
+
+function daysUntil(dateStr: string): number | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Contract-expiry radar: a recompete usually surfaces as a tender 6–18 months before
+ * an incumbent's contract ends. "imminent" (<=6mo) and "near" (<=18mo) are the windows
+ * worth watching; "past" contracts commonly still show as active due to reporting lag.
+ */
+function classifyExpiryWindow(days: number | null): Award["expiryWindow"] {
+  if (days === null) return null;
+  if (days < 0) return "past";
+  if (days <= 183) return "imminent";
+  if (days <= 548) return "near";
+  return "later";
+}
+
+/** "Non-competitive", limited tendering, and ACANs bypass full open competition. */
+const SOLE_SOURCE_METHODS = new Set([
+  "Non-competitive",
+  "Competitive - Limited tendering",
+  "Advance contract award notice",
+]);
 
 function fiscalYearOf(dateStr: string): string {
   const d = new Date(dateStr);
@@ -55,6 +88,7 @@ export function enrichAward(raw: RawAward): Award | null {
   const totalValue = parseMoney(raw.totalContractValue);
   const baseValue = parseMoney(raw.contractAmount);
   const value = totalValue > 0 ? totalValue : baseValue;
+  const daysToExpiry = daysUntil(raw.contractEnd);
   return {
     ...raw,
     categoryLabel: PROCUREMENT_CATEGORY_LABELS[raw.category.replace(/^\*/, "")] ?? raw.category,
@@ -63,6 +97,9 @@ export function enrichAward(raw: RawAward): Award | null {
     categories: m.categories,
     matchReasons: m.matchReasons,
     strength: m.strength,
+    daysToExpiry,
+    expiryWindow: classifyExpiryWindow(daysToExpiry),
+    isSoleSource: SOLE_SOURCE_METHODS.has(raw.method),
   };
 }
 
@@ -73,6 +110,7 @@ export interface VendorSummary {
   topBuyers: { name: string; count: number; value: number }[];
   categories: { name: string; count: number }[];
   byFiscalYear: { fiscalYear: string; value: number; count: number }[];
+  expiringContracts: Award[];
 }
 
 export function summarizeVendor(name: string, awards: Award[]): VendorSummary {
@@ -84,10 +122,12 @@ export function summarizeVendor(name: string, awards: Award[]): VendorSummary {
   let totalValue = 0;
   for (const a of vendorAwards) {
     totalValue += a.value;
-    const b = buyerMap.get(a.buyer) ?? { count: 0, value: 0 };
-    b.count += 1;
-    b.value += a.value;
-    buyerMap.set(a.buyer, b);
+    for (const org of effectiveOrgs(a)) {
+      const b = buyerMap.get(org) ?? { count: 0, value: 0 };
+      b.count += 1;
+      b.value += a.value;
+      buyerMap.set(org, b);
+    }
 
     for (const c of a.categories) catMap.set(c, (catMap.get(c) ?? 0) + 1);
 
@@ -110,6 +150,70 @@ export function summarizeVendor(name: string, awards: Award[]): VendorSummary {
     byFiscalYear: [...fyMap.entries()]
       .map(([fiscalYear, v]) => ({ fiscalYear, ...v }))
       .sort((a, b) => a.fiscalYear.localeCompare(b.fiscalYear)),
+    expiringContracts: vendorAwards
+      .filter((a) => a.expiryWindow === "imminent" || a.expiryWindow === "near")
+      .sort((a, b) => (a.daysToExpiry ?? Infinity) - (b.daysToExpiry ?? Infinity)),
+  };
+}
+
+export interface ExpiryFilters {
+  q?: string;
+  category?: string;
+  window?: "imminent" | "near";
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ExpiryQueryResult {
+  rows: Award[];
+  total: number;
+  page: number;
+  pageSize: number;
+  imminentCount: number;
+  nearCount: number;
+  imminentValue: number;
+  nearValue: number;
+  facets: { categories: { name: string; count: number }[] };
+}
+
+/** Upcoming recompete opportunities: contracts whose incumbent's term is ending soon. */
+export function queryExpiring(all: Award[], f: ExpiryFilters): ExpiryQueryResult {
+  const page = f.page ?? 1;
+  const pageSize = f.pageSize ?? 25;
+
+  const expiring = all.filter((a) => a.expiryWindow === "imminent" || a.expiryWindow === "near");
+  const imminent = expiring.filter((a) => a.expiryWindow === "imminent");
+  const near = expiring.filter((a) => a.expiryWindow === "near");
+
+  let rows = expiring;
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    rows = rows.filter(
+      (a) =>
+        a.title.toLowerCase().includes(q) ||
+        a.vendor.toLowerCase().includes(q) ||
+        a.buyer.toLowerCase().includes(q),
+    );
+  }
+  if (f.category) rows = rows.filter((a) => a.categories.includes(f.category!));
+  if (f.window) rows = rows.filter((a) => a.expiryWindow === f.window);
+
+  const facets = { categories: countBy(rows.flatMap((a) => a.categories)) };
+
+  rows = [...rows].sort((a, b) => (a.daysToExpiry ?? Infinity) - (b.daysToExpiry ?? Infinity));
+
+  const total = rows.length;
+  const start = (page - 1) * pageSize;
+  return {
+    rows: rows.slice(start, start + pageSize),
+    total,
+    page,
+    pageSize,
+    imminentCount: imminent.length,
+    nearCount: near.length,
+    imminentValue: imminent.reduce((s, a) => s + a.value, 0),
+    nearValue: near.reduce((s, a) => s + a.value, 0),
+    facets,
   };
 }
 
