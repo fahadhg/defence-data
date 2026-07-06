@@ -70,3 +70,5 @@ without touching the committed snapshot.
 `legacy/tender-pipeline/` is the original Python bid-scoring pipeline this project grew out of —
 it fetches open tenders and uses Claude to score bid-worthiness for a specific SME's capabilities,
 then sends a Slack/email digest. Not used by the current app, kept for reference.
+
+<!-- verifying Vercel git auto-deploy wiring -->
