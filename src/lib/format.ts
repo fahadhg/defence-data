@@ -45,3 +45,23 @@ export function fmtMoney(n: number): string {
 export function stripEmDash(s: string): string {
   return s.replace(/\s*—\s*/g, ": ");
 }
+
+/**
+ * These pages render on Vercel's server (no "use client"), so a bare toLocaleString() reflects
+ * the server's timezone (UTC), not the visitor's, and shows no timezone label either way, reading
+ * as if it were local time. Explicitly render in Eastern Time (what CanadaBuys itself uses) with
+ * an explicit "ET" label so it's unambiguous for every visitor regardless of where the page renders.
+ */
+export function fmtUpdatedAt(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const formatted = d.toLocaleString("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${formatted} ET`;
+}

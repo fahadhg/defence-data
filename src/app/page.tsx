@@ -6,7 +6,7 @@ import { StatTile } from "@/components/StatTile";
 import { CategoryBarChart } from "@/components/CategoryBarChart";
 import { TenderCard } from "@/components/TenderCard";
 import { ExpiringRow } from "@/components/ExpiringRow";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtUpdatedAt } from "@/lib/format";
 
 export default function OverviewPage() {
   const all = getTenders();
@@ -132,7 +132,7 @@ export default function OverviewPage() {
 
       {snapshot.generatedAt && (
         <p className="text-xs text-muted-2">
-          Snapshot generated {new Date(snapshot.generatedAt).toLocaleString("en-CA")} from CanadaBuys open
+          Snapshot generated {fmtUpdatedAt(snapshot.generatedAt)} from CanadaBuys open
           tender notices.
         </p>
       )}

@@ -5,6 +5,7 @@ import { queryStandingOffers } from "@/lib/standing-offers";
 import { StandingOfferRow } from "@/components/StandingOfferRow";
 import { StandingOfferFiltersBar } from "@/components/StandingOfferFiltersBar";
 import { StatTile } from "@/components/StatTile";
+import { fmtUpdatedAt } from "@/lib/format";
 
 export const metadata = { title: "Standing Offers | Defence Procurement Intelligence" };
 
@@ -38,7 +39,7 @@ export default async function StandingOffersPage({ searchParams }: { searchParam
           Pre-qualified supplier vehicles for defence and dual-use categories. These are often the
           entry ticket to federal defence work, since many buys happen only against existing
           holders rather than through a fresh open tender.
-          {snapshot.generatedAt && <> · updated {new Date(snapshot.generatedAt).toLocaleString("en-CA")}</>}
+          {snapshot.generatedAt && <> · updated {fmtUpdatedAt(snapshot.generatedAt)}</>}
         </p>
       </div>
 

@@ -4,6 +4,7 @@ import { queryTenders } from "@/lib/tenders";
 import { TenderCard } from "@/components/TenderCard";
 import { TenderFiltersBar } from "@/components/TenderFiltersBar";
 import Link from "next/link";
+import { fmtUpdatedAt } from "@/lib/format";
 
 export const metadata = { title: "Tenders | Defence Procurement Intelligence" };
 
@@ -37,7 +38,7 @@ export default async function TendersPage({ searchParams }: { searchParams: Sear
           <p className="text-sm text-muted mt-0.5">
             {snapshot.matched} of {snapshot.feedTotal} open tenders on CanadaBuys match defence/dual-use signals
             {snapshot.generatedAt && (
-              <> · updated {new Date(snapshot.generatedAt).toLocaleString("en-CA")}</>
+              <> · updated {fmtUpdatedAt(snapshot.generatedAt)}</>
             )}
           </p>
         </div>

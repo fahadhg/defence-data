@@ -5,7 +5,7 @@ import { queryItb, summarizeContractors } from "@/lib/itb";
 import { ItbRow } from "@/components/ItbRow";
 import { ItbFiltersBar } from "@/components/ItbFiltersBar";
 import { StatTile } from "@/components/StatTile";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtUpdatedAt } from "@/lib/format";
 
 export const metadata = { title: "Industrial & Technological Benefits | Defence Procurement Intelligence" };
 
@@ -36,7 +36,7 @@ export default async function IndustrialBenefitsPage({ searchParams }: { searchP
           Canadian industrial activity equal to the contract&apos;s value. Primes typically
           discharge this obligation by subcontracting to Canadian SMEs. This page shows that
           obligation, by prime and project, and how much of it remains outstanding.
-          {snapshot.generatedAt && <> · updated {new Date(snapshot.generatedAt).toLocaleString("en-CA")}</>}
+          {snapshot.generatedAt && <> · updated {fmtUpdatedAt(snapshot.generatedAt)}</>}
         </p>
       </div>
 

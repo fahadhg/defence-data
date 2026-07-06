@@ -5,6 +5,7 @@ import { queryBlueprint } from "@/lib/blueprint";
 import { BlueprintProjectCard } from "@/components/BlueprintProjectCard";
 import { BlueprintFiltersBar } from "@/components/BlueprintFiltersBar";
 import { StatTile } from "@/components/StatTile";
+import { fmtUpdatedAt } from "@/lib/format";
 
 export const metadata = { title: "Defence Investment Plan | Defence Procurement Intelligence" };
 
@@ -39,7 +40,7 @@ export default async function InvestmentPlanPage({ searchParams }: { searchParam
           >
             Defence Capabilities Blueprint
           </a>
-          .{snapshot.generatedAt && <> · updated {new Date(snapshot.generatedAt).toLocaleString("en-CA")}</>}
+          .{snapshot.generatedAt && <> · updated {fmtUpdatedAt(snapshot.generatedAt)}</>}
         </p>
       </div>
 

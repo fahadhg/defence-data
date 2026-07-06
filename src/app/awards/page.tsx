@@ -4,7 +4,7 @@ import { getAwards, getAwardSnapshot } from "@/lib/data";
 import { queryAwards } from "@/lib/awards";
 import { AwardRow } from "@/components/AwardRow";
 import { AwardFiltersBar } from "@/components/AwardFiltersBar";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, fmtUpdatedAt } from "@/lib/format";
 
 export const metadata = { title: "Contract History | Defence Procurement Intelligence" };
 
@@ -35,7 +35,7 @@ export default async function AwardsPage({ searchParams }: { searchParams: Searc
         <p className="text-sm text-muted mt-0.5">
           {snapshot.matched.toLocaleString()} of {snapshot.feedTotal.toLocaleString()} awarded contracts (FY
           2022-2023 – present) match defence/dual-use signals
-          {snapshot.generatedAt && <> · updated {new Date(snapshot.generatedAt).toLocaleString("en-CA")}</>}
+          {snapshot.generatedAt && <> · updated {fmtUpdatedAt(snapshot.generatedAt)}</>}
         </p>
       </div>
 
