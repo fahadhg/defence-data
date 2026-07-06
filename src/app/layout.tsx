@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 const NAV = [
   { href: "/", label: "Overview" },
   { href: "/tenders", label: "Tenders" },
-  { href: "/awards", label: "Awards (2022–present)" },
-  { href: "/contract-history", label: "Deep History (2011–present)" },
+  { href: "/awards", label: "Awards" },
+  { href: "/contract-history", label: "Deep History" },
   { href: "/expiring", label: "Expiry Radar" },
   { href: "/standing-offers", label: "Standing Offers" },
   { href: "/buyers", label: "Buyer Intelligence" },
@@ -29,19 +29,23 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <header className="border-b border-line sticky top-0 z-20 backdrop-blur bg-background/80">
-          <div className="mx-auto max-w-7xl px-5 h-14 flex items-center gap-6">
+          <div className="mx-auto max-w-7xl px-5 h-14 flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2.5 shrink-0">
               <span className="grid place-items-center w-6 h-6 rounded-sm bg-accent text-accent-ink font-bold text-xs mono">CA</span>
-              <span className="font-semibold tracking-tight">Defence Procurement <span className="text-muted font-normal">Intelligence</span></span>
+              <span className="font-semibold tracking-tight hidden md:inline">Defence Procurement <span className="text-muted font-normal">Intelligence</span></span>
             </Link>
-            <nav className="flex items-center gap-1 text-sm ml-2">
+            <nav className="flex items-center gap-1 text-sm min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="px-3 py-1.5 rounded-md text-muted hover:text-foreground hover:bg-panel transition-colors">
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className="px-3 py-1.5 rounded-md text-muted hover:text-foreground hover:bg-panel transition-colors whitespace-nowrap shrink-0"
+                >
                   {n.label}
                 </Link>
               ))}
             </nav>
-            <div className="ml-auto text-xs text-muted-2 mono hidden sm:block">source: CanadaBuys open data</div>
+            <div className="ml-auto text-xs text-muted-2 mono hidden lg:block shrink-0">source: CanadaBuys open data</div>
           </div>
         </header>
         <main className="flex-1 mx-auto max-w-7xl w-full px-5 py-7">{children}</main>
