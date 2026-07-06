@@ -48,7 +48,9 @@ export async function queryContracts(f: ContractFilters) {
       .select()
       .from(contracts)
       .where(where)
-      .orderBy(desc(contracts.contractValue))
+      // Postgres puts NULLs first in a DESC sort by default, which would mix unknown-value
+      // contracts in among the highest real ones in a "sorted by value" view. Force them last.
+      .orderBy(sql`${contracts.contractValue} DESC NULLS LAST`)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ count: sql<number>`count(*)::int` }).from(contracts).where(where),
