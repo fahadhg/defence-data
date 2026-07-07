@@ -2,8 +2,9 @@ name: Refresh defence investment plan snapshot
 
 on:
   schedule:
-    # Monthly (1st, 15:00 UTC) — DND's Defence Capabilities Blueprint updates infrequently (annual cycle).
-    - cron: "0 15 1 * *"
+    # Monthly (1st). DND's Defence Capabilities Blueprint updates infrequently (annual cycle).
+    # Off the exact hour so this round-hour slot isn't GitHub's most congested.
+    - cron: "17 15 1 * *"
   workflow_dispatch: {}
 
 permissions:

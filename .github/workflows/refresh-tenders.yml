@@ -2,8 +2,10 @@ name: Refresh defence tenders snapshot
 
 on:
   schedule:
-    # 13:00 UTC = 8/9am Eastern — after CanadaBuys' 7:00-8:30am ET morning refresh
-    - cron: "0 13 * * *"
+    # 13:07 UTC = ~8/9am Eastern, after CanadaBuys' 7:00-8:30am ET morning refresh.
+    # Off the exact hour on purpose: round-hour cron slots are GitHub's most congested and
+    # most likely to be silently dropped rather than just delayed.
+    - cron: "7 13 * * *"
   workflow_dispatch: {}
 
 permissions:

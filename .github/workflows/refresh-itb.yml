@@ -2,8 +2,9 @@ name: Refresh ITB obligations snapshot
 
 on:
   schedule:
-    # Monthly (15th, 15:00 UTC) — ISED's contractor-progress report updates infrequently.
-    - cron: "0 15 15 * *"
+    # Monthly (15th). ISED's contractor-progress report updates infrequently. Off the exact hour
+    # so this round-hour slot isn't GitHub's most congested.
+    - cron: "22 15 15 * *"
   workflow_dispatch: {}
 
 permissions:

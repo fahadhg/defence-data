@@ -2,8 +2,9 @@ name: Refresh deep contract history
 
 on:
   schedule:
-    # Monthly (1st, 16:00 UTC) — proactive disclosure is reported quarterly upstream.
-    - cron: "0 16 1 * *"
+    # Monthly (1st). Proactive disclosure is reported quarterly upstream. Off the exact hour
+    # so this round-hour slot isn't GitHub's most congested.
+    - cron: "27 16 1 * *"
   workflow_dispatch: {}
 
 jobs:

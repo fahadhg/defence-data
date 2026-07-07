@@ -2,8 +2,8 @@ name: Refresh defence awards snapshot
 
 on:
   schedule:
-    # Weekly (Mondays 13:00 UTC) — award/contract-history files refresh far less often than tenders.
-    - cron: "0 13 * * 1"
+    # Weekly (Mondays), off the exact hour so this round-hour slot isn't GitHub's most congested.
+    - cron: "9 13 * * 1"
   workflow_dispatch: {}
 
 permissions:
