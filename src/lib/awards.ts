@@ -47,7 +47,7 @@ function parseMoney(s: string): number {
   return isFinite(n) ? n : 0;
 }
 
-function daysUntil(dateStr: string): number | null {
+export function daysUntil(dateStr: string): number | null {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return null;
@@ -59,12 +59,19 @@ function daysUntil(dateStr: string): number | null {
  * an incumbent's contract ends. "imminent" (<=6mo) and "near" (<=18mo) are the windows
  * worth watching; "past" contracts commonly still show as active due to reporting lag.
  */
-function classifyExpiryWindow(days: number | null): Award["expiryWindow"] {
+export function classifyExpiryWindow(days: number | null): Award["expiryWindow"] {
   if (days === null) return null;
   if (days < 0) return "past";
   if (days <= 183) return "imminent";
   if (days <= 548) return "near";
   return "later";
+}
+
+/** Recompute the "as of now" fields on an already-enriched award. `contractEnd` never changes
+ * between snapshot refreshes, but "how many days until it expires" does, every single day. */
+export function refreshAwardTiming(a: Award): Award {
+  const daysToExpiry = daysUntil(a.contractEnd);
+  return { ...a, daysToExpiry, expiryWindow: classifyExpiryWindow(daysToExpiry) };
 }
 
 /** "Non-competitive", limited tendering, and ACANs bypass full open competition. */

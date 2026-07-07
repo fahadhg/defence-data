@@ -9,7 +9,9 @@ import "server-only";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Tender } from "./tenders";
+import { refreshTenderTiming } from "./tenders";
 import type { Award } from "./awards";
+import { refreshAwardTiming } from "./awards";
 import type { StandingOffer } from "./standing-offers";
 import type { BlueprintProject } from "./blueprint";
 import type { ItbObligation } from "./itb";
@@ -69,8 +71,12 @@ export function getSnapshot(): TenderSnapshot {
   return tenderCache;
 }
 
+// "Days until close/expiry" are baked into the snapshot at build time, so without recomputing
+// them here they'd silently drift stale between refreshes (a contract could show "0d left"
+// days after it actually expired). Recompute fresh on every read; the underlying date strings
+// only change when the snapshot itself is regenerated.
 export function getTenders(): Tender[] {
-  return getSnapshot().tenders;
+  return getSnapshot().tenders.map(refreshTenderTiming);
 }
 
 export function getTenderByRef(ref: string): Tender | undefined {
@@ -89,7 +95,7 @@ export function getAwardSnapshot(): AwardSnapshot {
 }
 
 export function getAwards(): Award[] {
-  return getAwardSnapshot().awards;
+  return getAwardSnapshot().awards.map(refreshAwardTiming);
 }
 
 export function getStandingOfferSnapshot(): StandingOfferSnapshot {

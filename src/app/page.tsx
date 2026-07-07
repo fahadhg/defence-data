@@ -8,6 +8,12 @@ import { TenderCard } from "@/components/TenderCard";
 import { ExpiringRow } from "@/components/ExpiringRow";
 import { fmtMoney, fmtUpdatedAt } from "@/lib/format";
 
+// Without this, Next.js prerenders this page once at build/deploy time. The day-counts on
+// "Closing within 14 days" and "Contract Expiry Radar" would then only refresh on the next
+// deploy instead of on every visit, reintroducing the same staleness class of bug as the
+// snapshot-baked timing fields.
+export const dynamic = "force-dynamic";
+
 export default function OverviewPage() {
   const all = getTenders();
   const snapshot = getSnapshot();

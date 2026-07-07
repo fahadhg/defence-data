@@ -44,12 +44,23 @@ export interface Tender {
   closingSoon: boolean;
 }
 
-function daysUntil(dateStr: string): number | null {
+export function daysUntil(dateStr: string): number | null {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return null;
   const ms = d.getTime() - Date.now();
   return Math.ceil(ms / (1000 * 60 * 60 * 24));
+}
+
+export function closingSoonFor(daysToClose: number | null): boolean {
+  return daysToClose !== null && daysToClose >= 0 && daysToClose <= 14;
+}
+
+/** Recompute the "as of now" fields on an already-enriched tender. `closes` never changes
+ * between snapshot refreshes, but "how many days until it closes" does, every single day. */
+export function refreshTenderTiming(t: Tender): Tender {
+  const daysToClose = daysUntil(t.closes);
+  return { ...t, daysToClose, closingSoon: closingSoonFor(daysToClose) };
 }
 
 /** Map a raw tender to enriched form; returns null if not defence-relevant. */
