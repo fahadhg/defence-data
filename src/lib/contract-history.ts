@@ -10,6 +10,14 @@ import { db } from "@/db/client";
 import { contracts } from "@/db/schema";
 import { sql, desc, and, ilike, or, type SQL } from "drizzle-orm";
 import { matchItbProject } from "./itb-match";
+import { unstable_cache } from "next/cache";
+
+// This data only changes on the monthly ingest refresh, but the aggregate queries below scan the
+// full ~376K-row table (the vendor-name normalization in particular has no index to lean on, since
+// it's a computed expression). Recomputing them on every single page view was measured at 2.6s+ for
+// getTopVendors alone, risking timeouts under load. Cache for 6 hours; a stale leaderboard for a few
+// hours between refreshes is a fine trade for not scanning the whole table on every visit.
+const CONTRACT_HISTORY_CACHE_SECONDS = 21600;
 
 /**
  * The government's own disclosure has no vendor ID, only free-text names, so the same legal
@@ -103,29 +111,37 @@ export async function getContractById(id: string) {
   return { ...row, itbMatch: matchItbProject(row.vendorName, row.contractValue) };
 }
 
-export async function getContractStats() {
-  const [row] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      totalValue: sql<number>`coalesce(sum(${contracts.contractValue}), 0)::float`,
-      distinctVendors: sql<number>`count(distinct ${contracts.vendorName})::int`,
-      distinctOrgs: sql<number>`count(distinct ${contracts.ownerOrgTitle})::int`,
-      earliestDate: sql<string>`min(${contracts.contractDate})`,
-    })
-    .from(contracts);
-  return row;
-}
+export const getContractStats = unstable_cache(
+  async () => {
+    const [row] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        totalValue: sql<number>`coalesce(sum(${contracts.contractValue}), 0)::float`,
+        distinctVendors: sql<number>`count(distinct ${contracts.vendorName})::int`,
+        distinctOrgs: sql<number>`count(distinct ${contracts.ownerOrgTitle})::int`,
+        earliestDate: sql<string>`min(${contracts.contractDate})`,
+      })
+      .from(contracts);
+    return row;
+  },
+  ["contract-history-stats"],
+  { revalidate: CONTRACT_HISTORY_CACHE_SECONDS },
+);
 
-export async function getCategoryBreakdown() {
-  return db
-    .select({
-      category: sql<string>`unnest(${contracts.categories})`,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(contracts)
-    .groupBy(sql`unnest(${contracts.categories})`)
-    .orderBy(desc(sql`count(*)`));
-}
+export const getCategoryBreakdown = unstable_cache(
+  async () => {
+    return db
+      .select({
+        category: sql<string>`unnest(${contracts.categories})`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(contracts)
+      .groupBy(sql`unnest(${contracts.categories})`)
+      .orderBy(desc(sql`count(*)`));
+  },
+  ["contract-history-category-breakdown"],
+  { revalidate: CONTRACT_HISTORY_CACHE_SECONDS },
+);
 
 export interface TopVendor {
   vendorName: string;
@@ -134,38 +150,42 @@ export interface TopVendor {
   count: number;
 }
 
-export async function getTopVendors(limit = 15): Promise<TopVendor[]> {
-  const result = await db.execute<{ vendor_name: string; norm_key: string; total_value: number; count: number }>(sql`
-    WITH normalized AS (
-      SELECT vendor_name, ${VENDOR_NORM_SQL} as norm_key, contract_value
-      FROM contracts
-      WHERE vendor_name IS NOT NULL AND vendor_name != ''
-    ),
-    grouped AS (
-      SELECT norm_key, coalesce(sum(contract_value), 0)::float as total_value, count(*)::int as count
-      FROM normalized
-      GROUP BY norm_key
-    ),
-    ranked_names AS (
-      SELECT norm_key, vendor_name,
-        row_number() OVER (PARTITION BY norm_key ORDER BY count(*) DESC) as rn
-      FROM normalized
-      GROUP BY norm_key, vendor_name
-    )
-    SELECT g.norm_key, rn.vendor_name, g.total_value, g.count
-    FROM grouped g
-    JOIN ranked_names rn ON rn.norm_key = g.norm_key AND rn.rn = 1
-    ORDER BY g.total_value DESC
-    LIMIT ${limit}
-  `);
+export const getTopVendors = unstable_cache(
+  async (limit = 15): Promise<TopVendor[]> => {
+    const result = await db.execute<{ vendor_name: string; norm_key: string; total_value: number; count: number }>(sql`
+      WITH normalized AS (
+        SELECT vendor_name, ${VENDOR_NORM_SQL} as norm_key, contract_value
+        FROM contracts
+        WHERE vendor_name IS NOT NULL AND vendor_name != ''
+      ),
+      grouped AS (
+        SELECT norm_key, coalesce(sum(contract_value), 0)::float as total_value, count(*)::int as count
+        FROM normalized
+        GROUP BY norm_key
+      ),
+      ranked_names AS (
+        SELECT norm_key, vendor_name,
+          row_number() OVER (PARTITION BY norm_key ORDER BY count(*) DESC) as rn
+        FROM normalized
+        GROUP BY norm_key, vendor_name
+      )
+      SELECT g.norm_key, rn.vendor_name, g.total_value, g.count
+      FROM grouped g
+      JOIN ranked_names rn ON rn.norm_key = g.norm_key AND rn.rn = 1
+      ORDER BY g.total_value DESC
+      LIMIT ${limit}
+    `);
 
-  return result.rows.map((r) => ({
-    vendorName: r.vendor_name,
-    normKey: r.norm_key,
-    totalValue: Number(r.total_value),
-    count: Number(r.count),
-  }));
-}
+    return result.rows.map((r) => ({
+      vendorName: r.vendor_name,
+      normKey: r.norm_key,
+      totalValue: Number(r.total_value),
+      count: Number(r.count),
+    }));
+  },
+  ["contract-history-top-vendors"],
+  { revalidate: CONTRACT_HISTORY_CACHE_SECONDS },
+);
 
 /** All contracts for a vendor, matched by normalized name so cosmetic variants of the same
  * legal entity (see VENDOR_NORM_SQL) are grouped as one vendor rather than split apart. */
