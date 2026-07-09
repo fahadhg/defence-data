@@ -43,7 +43,7 @@ const MILITARY_FSC: Record<string, string> = {
 };
 
 /** Dual-use keyword taxonomy → capability category. Word-boundary matched, case-insensitive. */
-const KEYWORD_CATEGORIES: { category: string; terms: string[] }[] = [
+export const KEYWORD_CATEGORIES: { category: string; terms: string[] }[] = [
   { category: "Defence & National Security", terms: [
     "\\bmilitary\\b", "\\bdefence\\b", "\\bdefense\\b", "warfighter", "national security",
     "\\bNORAD\\b", "\\bNATO\\b", "\\bIDEaS\\b", "soldier", "expeditionary",
@@ -118,7 +118,7 @@ function numericFsc(gsinCode: string): string | null {
   return digits.length >= 2 ? digits.slice(0, 2) : null;
 }
 
-function compile(term: string): RegExp {
+export function compile(term: string): RegExp {
   // Terms already containing regex tokens (\b…) are used as-is; plain words get word boundaries.
   return /\\/.test(term) ? new RegExp(term, "i") : new RegExp(`\\b${term}\\b`, "i");
 }
