@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getTenderByRef } from "@/lib/data";
-import { fmtDate, closeBadge, categoryTone } from "@/lib/format";
+import { getTenderByRef, getAwards } from "@/lib/data";
+import { findTeamingCandidates } from "@/lib/awards";
+import { fmtDate, fmtMoney, closeBadge, categoryTone } from "@/lib/format";
 import { Chip } from "@/components/Chip";
 
 type Params = Promise<{ ref: string }>;
@@ -12,6 +13,7 @@ export default async function TenderDetailPage({ params }: { params: Params }) {
   if (!tender) notFound();
 
   const badge = closeBadge(tender.daysToClose);
+  const teamingCandidates = findTeamingCandidates(tender, getAwards());
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -64,6 +66,33 @@ export default async function TenderDetailPage({ params }: { params: Params }) {
           ))}
         </ul>
       </div>
+
+      {teamingCandidates.length > 0 && (
+        <div>
+          <h2 className="text-sm font-medium text-muted mb-2">Teaming directory</h2>
+          <p className="text-xs text-muted-2 mb-2">
+            Vendors that recently won work in this same capability category. A competitor on paper
+            can be a viable teaming partner in practice, especially for scope too large to bid solo.
+          </p>
+          <div className="panel divide-y divide-line">
+            {teamingCandidates.map((c) => (
+              <Link
+                key={c.vendor}
+                href={`/vendors/${encodeURIComponent(c.vendor)}`}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-panel-2 transition-colors"
+              >
+                <div className="min-w-0 flex items-center gap-2">
+                  <span className="truncate">{c.vendor}</span>
+                  {c.sameBuyer && <Chip tone="accent">same buyer</Chip>}
+                </div>
+                <div className="text-right shrink-0 text-xs text-muted-2 mono">
+                  {fmtMoney(c.totalValue)} · {c.awardCount} award{c.awardCount === 1 ? "" : "s"} · most recent {fmtDate(c.mostRecentAward.awardDate)}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {(tender.contactName || tender.contactEmail) && (
         <div>

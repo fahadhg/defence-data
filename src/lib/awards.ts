@@ -293,6 +293,56 @@ export function queryAwards(all: Award[], f: AwardFilters): AwardQueryResult {
   return { rows: rows.slice(start, start + pageSize), total, page, pageSize, totalValue, facets };
 }
 
+export interface TeamingCandidate {
+  vendor: string;
+  awardCount: number;
+  totalValue: number;
+  sameBuyer: boolean;
+  mostRecentAward: Award;
+}
+
+/**
+ * Who else has recently won work in the same space as an open tender. A competitor on paper is
+ * often a viable teaming partner in practice, especially for a scope too large to bid solo.
+ * Matches on shared capability category (the tender's own classification); a match against the
+ * same buying department is a stronger signal and sorts first, but isn't required, since a firm
+ * active in a category elsewhere in government is still a reasonable lead.
+ */
+export function findTeamingCandidates(
+  tender: { categories: string[]; buyer?: string; endUser?: string },
+  awards: Award[],
+  limit = 8,
+): TeamingCandidate[] {
+  if (tender.categories.length === 0) return [];
+  const tenderOrgs = new Set(effectiveOrgs(tender));
+
+  const byVendor = new Map<string, { count: number; totalValue: number; sameBuyer: boolean; mostRecent: Award }>();
+  for (const a of awards) {
+    if (!a.vendor) continue;
+    if (!a.categories.some((c) => tender.categories.includes(c))) continue;
+
+    const sameBuyer = effectiveOrgs(a).some((o) => tenderOrgs.has(o));
+    const existing = byVendor.get(a.vendor);
+    if (!existing) {
+      byVendor.set(a.vendor, { count: 1, totalValue: a.value, sameBuyer, mostRecent: a });
+    } else {
+      existing.count += 1;
+      existing.totalValue += a.value;
+      existing.sameBuyer = existing.sameBuyer || sameBuyer;
+      if (new Date(a.awardDate).getTime() > new Date(existing.mostRecent.awardDate).getTime()) existing.mostRecent = a;
+    }
+  }
+
+  return [...byVendor.entries()]
+    .map(([vendor, v]) => ({ vendor, awardCount: v.count, totalValue: v.totalValue, sameBuyer: v.sameBuyer, mostRecentAward: v.mostRecent }))
+    .sort(
+      (a, b) =>
+        Number(b.sameBuyer) - Number(a.sameBuyer) ||
+        new Date(b.mostRecentAward.awardDate).getTime() - new Date(a.mostRecentAward.awardDate).getTime(),
+    )
+    .slice(0, limit);
+}
+
 function countBy(values: string[]): { name: string; count: number }[] {
   const m = new Map<string, number>();
   for (const v of values) {

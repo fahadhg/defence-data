@@ -105,6 +105,80 @@ export function queryStandingOffers(all: StandingOffer[], f: StandingOfferFilter
   return { rows: rows.slice(start, start + pageSize), total, page, pageSize, facets };
 }
 
+/** Plain-language label for the government's own agreement-type codes. */
+export const AGREEMENT_TYPE_LABELS: Record<string, string> = {
+  SA: "Supply Arrangement",
+  NMSO: "National Master Standing Offer",
+  RMSO: "Regional Master Standing Offer",
+  NISO: "National Individual Standing Offer",
+  RISO: "Regional Individual Standing Offer",
+  DISO: "Departmental Individual Standing Offer",
+};
+
+export interface SupplierArrangement {
+  title: string;
+  agreementType: string;
+  agreementTypeLabel: string;
+  supplierCount: number;
+  suppliers: string[];
+  categories: string[];
+  endUser: string;
+  earliestExpiry: number | null;
+  latestExpiry: number | null;
+  anyActive: boolean;
+  /** Descriptive only, not a claim about a live application window - see the page's own caveat. */
+  opennessLabel: string;
+}
+
+/**
+ * Group individual supplier rows into their parent arrangement, so "how many suppliers hold
+ * this vehicle" becomes visible. Supply Arrangements (type "SA") are the vehicle type PSPC
+ * generally keeps open to periodic new-supplier qualification; Standing Offers (the SO variants)
+ * are typically a fixed roster set at competition time. This is real, useful context but not a
+ * live read of whether a given vehicle is accepting applications today - said so on the page.
+ */
+export function groupArrangements(offers: StandingOffer[]): SupplierArrangement[] {
+  const byTitle = new Map<string, StandingOffer[]>();
+  for (const o of offers) {
+    if (!byTitle.has(o.title)) byTitle.set(o.title, []);
+    byTitle.get(o.title)!.push(o);
+  }
+
+  const arrangements: SupplierArrangement[] = [];
+  for (const [title, rows] of byTitle) {
+    const suppliers = [...new Set(rows.map((r) => r.supplierLegalName || r.supplierName).filter(Boolean))];
+    const categories = [...new Set(rows.flatMap((r) => r.categories))];
+    const expiries = rows.map((r) => r.daysToExpiry).filter((d): d is number => d !== null);
+    const agreementType = rows[0].agreementType;
+    const anyActive = rows.some((r) => !r.isExpired);
+
+    let opennessLabel: string;
+    if (agreementType === "SA") {
+      opennessLabel = suppliers.length === 1 ? "Supply Arrangement, 1 qualified supplier so far" : `Supply Arrangement, ${suppliers.length} qualified suppliers`;
+    } else if (suppliers.length === 1) {
+      opennessLabel = "Single-supplier arrangement";
+    } else {
+      opennessLabel = `Multi-supplier pool (${suppliers.length} suppliers)`;
+    }
+
+    arrangements.push({
+      title,
+      agreementType,
+      agreementTypeLabel: AGREEMENT_TYPE_LABELS[agreementType] ?? agreementType,
+      supplierCount: suppliers.length,
+      suppliers,
+      categories,
+      endUser: rows[0].endUser,
+      earliestExpiry: expiries.length ? Math.min(...expiries) : null,
+      latestExpiry: expiries.length ? Math.max(...expiries) : null,
+      anyActive,
+      opennessLabel,
+    });
+  }
+
+  return arrangements;
+}
+
 function countBy(values: string[]): { name: string; count: number }[] {
   const m = new Map<string, number>();
   for (const v of values) {
