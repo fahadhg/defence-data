@@ -12,7 +12,11 @@ export function ContractRow({ contract }: { contract: ContractWithItbMatch }) {
     <div className="panel p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-medium leading-snug text-[0.95rem] truncate">{title}</h3>
+          <h3 className="font-medium leading-snug text-[0.95rem] truncate">
+            <Link href={`/contract-history/${encodeURIComponent(contract.id)}`} className="hover:text-accent transition-colors">
+              {title}
+            </Link>
+          </h3>
           {contract.itbMatch && contract.descriptionEn && (
             <div className="text-xs text-muted-2 mt-0.5 truncate">
               Government record says: {contract.descriptionEn}

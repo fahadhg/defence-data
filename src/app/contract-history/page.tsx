@@ -18,8 +18,10 @@ export default async function ContractHistoryPage({ searchParams }: { searchPara
   const sp = await searchParams;
   const page = Number(first(sp.page) ?? "1") || 1;
 
+  const vendorName = first(sp.vendorName);
+
   const [result, stats, categories, topVendors] = await Promise.all([
-    queryContracts({ q: first(sp.q), category: first(sp.category), page, pageSize: 20 }),
+    queryContracts({ q: first(sp.q), category: first(sp.category), vendorName, page, pageSize: 20 }),
     getContractStats(),
     getCategoryBreakdown(),
     getTopVendors(10),
@@ -51,8 +53,8 @@ export default async function ContractHistoryPage({ searchParams }: { searchPara
         <div className="panel p-4 space-y-2">
           {topVendors.map((v) => (
             <Link
-              key={v.vendorName}
-              href={`/vendors/${encodeURIComponent(v.vendorName ?? "")}`}
+              key={v.normKey}
+              href={`/contract-history?vendorName=${encodeURIComponent(v.vendorName)}`}
               className="flex items-center justify-between text-sm py-0.5 hover:text-accent transition-colors"
             >
               <span className="truncate pr-3 text-muted">{v.vendorName}</span>
@@ -67,6 +69,16 @@ export default async function ContractHistoryPage({ searchParams }: { searchPara
       <Suspense>
         <ContractFiltersBar categories={categories} />
       </Suspense>
+
+      {vendorName && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-2">Filtered to vendor:</span>
+          <span className="chip chip-accent">{vendorName}</span>
+          <Link href="/contract-history" className="text-xs link-accent">
+            clear ×
+          </Link>
+        </div>
+      )}
 
       <div className="text-sm text-muted-2">
         {result.total.toLocaleString()} result{result.total === 1 ? "" : "s"}, sorted by value

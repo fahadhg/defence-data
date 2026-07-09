@@ -11,6 +11,33 @@ import { contracts } from "@/db/schema";
 import { sql, desc, and, ilike, or, type SQL } from "drizzle-orm";
 import { matchItbProject } from "./itb-match";
 
+/**
+ * The government's own disclosure has no vendor ID, only free-text names, so the same legal
+ * entity shows up under dozens of cosmetic variants (case, stray whitespace, trailing periods,
+ * "Inc" vs "Ltd" vs no suffix at all) - verified against real data: "MDA Geospatial Services
+ * Inc." alone had 14 such variants worth $850M combined, all clearly one company. This strips
+ * only case, punctuation, whitespace, and common legal-entity suffix words - it deliberately does
+ * NOT fuzzy-match spelling (typos like "Geosptatial") or merge on a shared word (the dataset also
+ * contains an unrelated person, an architecture firm, and unrelated small businesses that all
+ * happen to contain "MDA" as a substring). Order matters: lowercase before stripping suffix words,
+ * since Postgres regex is case-sensitive by default.
+ */
+function vendorNormSql(expr: SQL) {
+  return sql`
+    trim(
+      regexp_replace(
+        regexp_replace(
+          regexp_replace(lower(trim(${expr})), '[.,]', '', 'g'),
+          '\\s+', ' ', 'g'
+        ),
+        '\\y(inc|incorporated|ltd|limited|corp|corporation|co|company|llc|lp|llp|plc)\\y', '', 'g'
+      )
+    )
+  `;
+}
+
+const VENDOR_NORM_SQL = vendorNormSql(sql`${contracts.vendorName}`);
+
 export interface ContractFilters {
   q?: string;
   ownerOrg?: string;
@@ -33,7 +60,10 @@ function buildWhere(f: ContractFilters): SQL | undefined {
     );
   }
   if (f.ownerOrg) clauses.push(ilike(contracts.ownerOrgTitle, `%${f.ownerOrg}%`));
-  if (f.vendorName) clauses.push(sql`${contracts.vendorName} = ${f.vendorName}`);
+  // Normalized match, not exact string equality, so filtering by one spelling of a vendor
+  // ("MDA Geospatial Services Inc.") also picks up its cosmetic variants ("MDA GEOSPATIAL
+  // SERVICES INC", trailing whitespace, etc.) rather than only that one exact spelling.
+  if (f.vendorName) clauses.push(sql`${VENDOR_NORM_SQL} = ${vendorNormSql(sql`${f.vendorName}`)}`);
   if (f.category) clauses.push(sql`${f.category} = ANY(${contracts.categories})`);
   return clauses.length ? and(...clauses) : undefined;
 }
@@ -67,6 +97,12 @@ export async function queryContracts(f: ContractFilters) {
   return { rows, total: totalRow[0]?.count ?? 0, page, pageSize };
 }
 
+export async function getContractById(id: string) {
+  const [row] = await db.select().from(contracts).where(sql`${contracts.id} = ${id}`).limit(1);
+  if (!row) return undefined;
+  return { ...row, itbMatch: matchItbProject(row.vendorName, row.contractValue) };
+}
+
 export async function getContractStats() {
   const [row] = await db
     .select({
@@ -91,21 +127,51 @@ export async function getCategoryBreakdown() {
     .orderBy(desc(sql`count(*)`));
 }
 
-export async function getTopVendors(limit = 15) {
-  return db
-    .select({
-      vendorName: contracts.vendorName,
-      totalValue: sql<number>`coalesce(sum(${contracts.contractValue}), 0)::float`,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(contracts)
-    .where(sql`${contracts.vendorName} is not null and ${contracts.vendorName} != ''`)
-    .groupBy(contracts.vendorName)
-    .orderBy(desc(sql`sum(${contracts.contractValue})`))
-    .limit(limit);
+export interface TopVendor {
+  vendorName: string;
+  normKey: string;
+  totalValue: number;
+  count: number;
 }
 
+export async function getTopVendors(limit = 15): Promise<TopVendor[]> {
+  const result = await db.execute<{ vendor_name: string; norm_key: string; total_value: number; count: number }>(sql`
+    WITH normalized AS (
+      SELECT vendor_name, ${VENDOR_NORM_SQL} as norm_key, contract_value
+      FROM contracts
+      WHERE vendor_name IS NOT NULL AND vendor_name != ''
+    ),
+    grouped AS (
+      SELECT norm_key, coalesce(sum(contract_value), 0)::float as total_value, count(*)::int as count
+      FROM normalized
+      GROUP BY norm_key
+    ),
+    ranked_names AS (
+      SELECT norm_key, vendor_name,
+        row_number() OVER (PARTITION BY norm_key ORDER BY count(*) DESC) as rn
+      FROM normalized
+      GROUP BY norm_key, vendor_name
+    )
+    SELECT g.norm_key, rn.vendor_name, g.total_value, g.count
+    FROM grouped g
+    JOIN ranked_names rn ON rn.norm_key = g.norm_key AND rn.rn = 1
+    ORDER BY g.total_value DESC
+    LIMIT ${limit}
+  `);
+
+  return result.rows.map((r) => ({
+    vendorName: r.vendor_name,
+    normKey: r.norm_key,
+    totalValue: Number(r.total_value),
+    count: Number(r.count),
+  }));
+}
+
+/** All contracts for a vendor, matched by normalized name so cosmetic variants of the same
+ * legal entity (see VENDOR_NORM_SQL) are grouped as one vendor rather than split apart. */
 export async function getVendorHistory(vendorName: string) {
+  const normMatch = sql`${VENDOR_NORM_SQL} = ${vendorNormSql(sql`${vendorName}`)}`;
+
   const [summary] = await db
     .select({
       totalValue: sql<number>`coalesce(sum(${contracts.contractValue}), 0)::float`,
@@ -114,12 +180,12 @@ export async function getVendorHistory(vendorName: string) {
       latestDate: sql<string>`max(${contracts.contractDate})`,
     })
     .from(contracts)
-    .where(sql`${contracts.vendorName} = ${vendorName}`);
+    .where(normMatch);
 
   const recent = await db
     .select()
     .from(contracts)
-    .where(sql`${contracts.vendorName} = ${vendorName}`)
+    .where(normMatch)
     .orderBy(desc(contracts.contractDate))
     .limit(20);
 
