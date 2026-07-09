@@ -76,6 +76,33 @@ export interface StandingOfferQueryResult {
   };
 }
 
+/**
+ * The raw SOSA feed publishes one row per delivery point for the same underlying arrangement -
+ * verified against real data: 164 of 847 arrangement/supplier groups differ in nothing except
+ * `deliveryPoint` (one row says "Canada", another "United States", everything else byte-identical).
+ * Left alone, browsing shows what looks like meaningless duplicate cards. Merge those into one row
+ * with a combined delivery point list.
+ */
+export function dedupeByDeliveryPoint(offers: StandingOffer[]): StandingOffer[] {
+  const groups = new Map<string, StandingOffer[]>();
+  for (const o of offers) {
+    const key = [o.title, o.supplierName, o.agreementNumber, o.awardDate].join("|");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(o);
+  }
+
+  const result: StandingOffer[] = [];
+  for (const rows of groups.values()) {
+    if (rows.length === 1) {
+      result.push(rows[0]);
+      continue;
+    }
+    const points = [...new Set(rows.map((r) => r.deliveryPoint).filter(Boolean))].sort();
+    result.push({ ...rows[0], deliveryPoint: points.join(", ") });
+  }
+  return result;
+}
+
 export function queryStandingOffers(all: StandingOffer[], f: StandingOfferFilters): StandingOfferQueryResult {
   const page = f.page ?? 1;
   const pageSize = f.pageSize ?? 25;

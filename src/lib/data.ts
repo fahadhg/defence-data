@@ -13,6 +13,7 @@ import { refreshTenderTiming } from "./tenders";
 import type { Award } from "./awards";
 import { refreshAwardTiming } from "./awards";
 import type { StandingOffer } from "./standing-offers";
+import { dedupeByDeliveryPoint } from "./standing-offers";
 import type { BlueprintProject } from "./blueprint";
 import type { ItbObligation } from "./itb";
 
@@ -109,8 +110,10 @@ export function getStandingOfferSnapshot(): StandingOfferSnapshot {
   return standingOfferCache;
 }
 
+// The raw feed publishes one row per delivery point for the same arrangement, which otherwise
+// shows as meaningless-looking duplicate cards - see dedupeByDeliveryPoint's own comment.
 export function getStandingOffers(): StandingOffer[] {
-  return getStandingOfferSnapshot().offers;
+  return dedupeByDeliveryPoint(getStandingOfferSnapshot().offers);
 }
 
 export function getBlueprintSnapshot(): BlueprintSnapshot {

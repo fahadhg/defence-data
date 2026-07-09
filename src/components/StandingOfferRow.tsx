@@ -22,6 +22,7 @@ export function StandingOfferRow({ offer }: { offer: StandingOffer }) {
       </div>
       <div className="mt-3 text-xs text-muted-2 mono">
         {fmtDate(offer.awardDate)} → {fmtDate(offer.expiryDate)} · {offer.agreementNumber}
+        {offer.deliveryPoint && <> · delivers to: {offer.deliveryPoint}</>}
       </div>
     </div>
   );
