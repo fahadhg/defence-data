@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getItbRows, getItbSnapshot } from "@/lib/data";
 import { queryItb, summarizeContractors } from "@/lib/itb";
-import { matchCompaniesForCategories, type NgenCompany } from "@/lib/ngen-members";
 import { ItbRow } from "@/components/ItbRow";
 import { ItbFiltersBar } from "@/components/ItbFiltersBar";
 import { StatTile } from "@/components/StatTile";
@@ -27,7 +26,6 @@ export default async function IndustrialBenefitsPage({ searchParams }: { searchP
   const totalObligation = all.reduce((s, r) => s + r.obligation, 0);
   const totalRemaining = all.reduce((s, r) => s + r.remainingObligation, 0);
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
-  const leadsByRow: NgenCompany[][] = await Promise.all(result.rows.map((r) => matchCompaniesForCategories(r.categories, 5)));
 
   return (
     <div className="space-y-5">
@@ -37,9 +35,7 @@ export default async function IndustrialBenefitsPage({ searchParams }: { searchP
           When a prime wins a major defence contract, the ITB Policy requires it to generate
           Canadian industrial activity equal to the contract&apos;s value. Primes typically
           discharge this obligation by subcontracting to Canadian SMEs. This page shows that
-          obligation, by prime and project, how much of it remains outstanding, and which NGen
-          member companies work in that project&apos;s capability area, so the obligation becomes
-          an actual lead rather than just a number.
+          obligation, by prime and project, and how much of it remains outstanding.
           {snapshot.generatedAt && <> · updated {fmtUpdatedAt(snapshot.generatedAt)}</>}
         </p>
       </div>
@@ -75,7 +71,7 @@ export default async function IndustrialBenefitsPage({ searchParams }: { searchP
 
       <div className="grid gap-3 sm:grid-cols-2">
         {result.rows.map((r, i) => (
-          <ItbRow key={`${r.contractor}-${r.project}-${i}`} row={r} leads={leadsByRow[i]} />
+          <ItbRow key={`${r.contractor}-${r.project}-${i}`} row={r} />
         ))}
       </div>
 
@@ -107,11 +103,7 @@ export default async function IndustrialBenefitsPage({ searchParams }: { searchP
           ISED Report on Contractor Progress
         </a>
         . &quot;Remaining&quot; = total obligation minus completed-to-date; it does not distinguish
-        work already subcontracted from work still open to bid. Subcontracting leads are NGen
-        member companies whose self-described capabilities match the project&apos;s category, keyword-matched
-        the same way tenders and awards are classified elsewhere on this site. Company descriptions
-        are AI-extracted from public websites and may occasionally be inaccurate or too broad -
-        treat this as a starting list to research, not a verified directory.
+        work already subcontracted from work still open to bid.
       </p>
     </div>
   );

@@ -22,6 +22,7 @@ const NAV = [
   { href: "/buyers", label: "Buyer Intelligence" },
   { href: "/investment-plan", label: "Investment Plan" },
   { href: "/industrial-benefits", label: "Industrial Benefits" },
+  { href: "/opportunity-finder", label: "Opportunity Finder" },
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,9 +1,8 @@
 import type { ItbObligation } from "@/lib/itb";
-import type { NgenCompany } from "@/lib/ngen-members";
 import { fmtMoney, categoryTone } from "@/lib/format";
 import { Chip } from "./Chip";
 
-export function ItbRow({ row, leads }: { row: ItbObligation; leads?: NgenCompany[] }) {
+export function ItbRow({ row }: { row: ItbObligation }) {
   const pct = row.percentComplete !== null ? Math.round(row.percentComplete * 100) : null;
   return (
     <div className="panel p-4">
@@ -27,31 +26,6 @@ export function ItbRow({ row, leads }: { row: ItbObligation; leads?: NgenCompany
         {pct !== null && <span>{pct}% complete</span>}
         {row.estimatedTimeframe && <span>{row.estimatedTimeframe}</span>}
       </div>
-
-      {leads && leads.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-line">
-          <div className="text-xs text-muted-2">
-            {row.toBeIdentified > 0 ? (
-              <>{fmtMoney(row.toBeIdentified)} of this is still unidentified. Potential subcontracting leads:</>
-            ) : (
-              "NGen members in this capability area:"
-            )}
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-            {leads.map((c) => (
-              <a
-                key={c.id}
-                href={c.homepage || `https://${c.site}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs link-accent"
-              >
-                {c.companyName}
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

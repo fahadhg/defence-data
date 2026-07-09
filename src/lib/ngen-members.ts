@@ -3,15 +3,22 @@
  * database (a separate internal tool: AI-extracted company profiles from public websites, not
  * self-reported by companies). Read-only here; this project never writes to that database.
  *
- * Used to power the Subcontracting Opportunity Finder: ITB obligations name which primes still
- * owe Canadian industrial activity and how much of it is unidentified, but not who could actually
- * do the work. Cross-referencing against member capabilities turns that into an actual lead list.
+ * Powers the Opportunity Finder: a member finds their own company, and this classifies its
+ * capability categories (same taxonomy as the rest of the app) so the finder can show matching
+ * open tenders, ITB subcontracting opportunities, and standing offers - opportunities FOR that
+ * company, not a leads list for someone else.
  *
  * Company text is AI-extracted from public sites and occasionally mismatched or wrong (confirmed
  * during scoping: one row's declared name and its extracted content described two different
- * companies entirely). Categorization here is keyword-based, same taxonomy as the rest of the
- * app, and results should read as "companies that mention this capability," not a verified
- * directory - said so wherever this is shown.
+ * companies entirely). Categorization here is keyword-based and results should read as "this
+ * company mentions this capability," not a verified fact - said so wherever this is shown.
+ *
+ * Search and lookup are pushed down to Supabase's own query filtering (ilike / eq) rather than
+ * fetching all ~5,127 companies into Node and filtering in memory. That's not just more correct
+ * (a live query, not whatever's in a stale cache) - fetching and caching the full list was
+ * measured at 5.5MB, well over Next's 2MB per-cache-entry limit, and failed to cache at all
+ * (silently at first, then as an actual unhandled rejection that broke the rest of the page).
+ * Per-search-term and per-id caching below stays naturally small.
  */
 import { unstable_cache } from "next/cache";
 import { KEYWORD_CATEGORIES, compile } from "./defence-filter";
@@ -35,49 +42,58 @@ interface SupabaseRow {
   products: string[] | null;
 }
 
-const PAGE_SIZE = 1000;
+// Only capabilities/products are fetched, not industries_served/certifications/tagline/etc -
+// tested against real data: including industries_served alone triples false-positive category
+// matches by pulling in anything that merely lists a sector among many it sells into, rather than
+// companies that describe building the thing.
+const SELECT = "id,company_name,site,homepage,capabilities,capabilities_enhanced,products";
 
-// Matching only on self-described capabilities/products, not industries_served or
-// certifications - tested against real data: including industries_served alone triples the
-// Aerospace & Aircraft match count (232 -> 849) by pulling in anything that merely lists
-// "Aerospace" among many customer industries it sells into, rather than companies that actually
-// describe building the thing. Those unused fields aren't fetched at all, which also keeps the
-// cached payload well under Next's 2MB per-entry cache limit (the full field set was 2.9MB-7MB
-// and silently failed to cache at all).
-async function fetchAllRows(): Promise<SupabaseRow[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return [];
-
-  const select = "id,company_name,site,homepage,capabilities,capabilities_enhanced,products";
-  const rows: SupabaseRow[] = [];
-  for (let offset = 0; ; offset += PAGE_SIZE) {
-    const resp = await fetch(`${url}/rest/v1/companies?select=${select}&limit=${PAGE_SIZE}&offset=${offset}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
-    });
-    if (!resp.ok) throw new Error(`NGen Connect fetch failed: ${resp.status} ${resp.statusText}`);
-    const page = (await resp.json()) as SupabaseRow[];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
-  }
-  return rows;
+function toCompany(r: SupabaseRow): NgenCompany {
+  return {
+    id: r.id,
+    companyName: r.company_name,
+    site: r.site,
+    homepage: r.homepage,
+    capabilities: [...new Set([...(r.capabilities ?? []), ...(r.capabilities_enhanced ?? [])])],
+    products: r.products ?? [],
+  };
 }
 
-/** This dataset is refreshed independently by the NGen Connect pipeline, not by anything in this
- * project. Cache for a day so the finder doesn't hit Supabase on every single page view. */
-const getNgenCompanies = unstable_cache(
-  async (): Promise<NgenCompany[]> => {
-    const rows = await fetchAllRows();
-    return rows.map((r) => ({
-      id: r.id,
-      companyName: r.company_name,
-      site: r.site,
-      homepage: r.homepage,
-      capabilities: [...new Set([...(r.capabilities ?? []), ...(r.capabilities_enhanced ?? [])])],
-      products: r.products ?? [],
-    }));
+function supabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return url && key ? { url, key } : null;
+}
+
+export const searchNgenCompanies = unstable_cache(
+  async (query: string, limit = 20): Promise<NgenCompany[]> => {
+    const q = query.trim();
+    const cfg = supabaseConfig();
+    if (!q || !cfg) return [];
+    const resp = await fetch(
+      `${cfg.url}/rest/v1/companies?select=${SELECT}&company_name=ilike.*${encodeURIComponent(q)}*&limit=${limit}`,
+      { headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` } },
+    );
+    if (!resp.ok) throw new Error(`NGen Connect search failed: ${resp.status} ${resp.statusText}`);
+    const rows = (await resp.json()) as SupabaseRow[];
+    return rows.map(toCompany);
   },
-  ["ngen-member-companies"],
+  ["ngen-company-search"],
+  { revalidate: 86400 },
+);
+
+export const getNgenCompanyById = unstable_cache(
+  async (id: string): Promise<NgenCompany | undefined> => {
+    const cfg = supabaseConfig();
+    if (!cfg) return undefined;
+    const resp = await fetch(`${cfg.url}/rest/v1/companies?select=${SELECT}&id=eq.${encodeURIComponent(id)}&limit=1`, {
+      headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` },
+    });
+    if (!resp.ok) throw new Error(`NGen Connect lookup failed: ${resp.status} ${resp.statusText}`);
+    const rows = (await resp.json()) as SupabaseRow[];
+    return rows[0] ? toCompany(rows[0]) : undefined;
+  },
+  ["ngen-company-by-id"],
   { revalidate: 86400 },
 );
 
@@ -87,41 +103,11 @@ function companyTextBlob(c: NgenCompany): string {
 
 /** Same keyword taxonomy the rest of the app classifies tenders/awards/ITB projects with, so a
  * company tagged "Aerospace & Aircraft" here means the same thing it means everywhere else. */
-function classifyCompanyCategories(c: NgenCompany): string[] {
+export function classifyCompanyCategories(c: NgenCompany): string[] {
   const text = companyTextBlob(c);
   const categories: string[] = [];
   for (const { category, terms } of KEYWORD_CATEGORIES) {
     if (terms.some((term) => compile(term).test(text))) categories.push(category);
   }
   return categories;
-}
-
-/**
- * Cached per category rather than as one combined index - a company can match several
- * categories, so a single combined blob duplicates full company objects across every category
- * it's tagged with, which pushed the cached size to 7MB and silently failed to cache at all
- * (same 2MB-per-entry limit as above). Splitting by category keeps each entry small; unstable_cache
- * keys automatically include the function arguments, so each category gets its own cache slot.
- */
-const getNgenCompaniesForCategory = unstable_cache(
-  async (category: string): Promise<NgenCompany[]> => {
-    const companies = await getNgenCompanies();
-    return companies.filter((c) => classifyCompanyCategories(c).includes(category));
-  },
-  ["ngen-companies-by-category"],
-  { revalidate: 86400 },
-);
-
-export async function matchCompaniesForCategories(categories: string[], limit = 6): Promise<NgenCompany[]> {
-  const seen = new Set<string>();
-  const matches: NgenCompany[] = [];
-  for (const category of categories) {
-    for (const c of await getNgenCompaniesForCategory(category)) {
-      if (seen.has(c.id)) continue;
-      seen.add(c.id);
-      matches.push(c);
-      if (matches.length >= limit) return matches;
-    }
-  }
-  return matches;
 }
